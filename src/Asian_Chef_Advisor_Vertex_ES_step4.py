@@ -74,7 +74,7 @@ st.title("📄 Demo 4: Vertex RAG with Judge Model")
 
 def load_system_instruction():
     try:
-        with open("system_instruction.txt", "r") as file:
+        with open("./prompts/system_instruction.txt", "r") as file:
             system_instruction = file.read()
     except FileNotFoundError:
         print("Error: system_instruction.txt not found.")

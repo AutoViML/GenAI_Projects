@@ -27,13 +27,19 @@ The demo begins with a fictional use case for an Asian Chef Advisor chatbot for 
     * **Local Vector Store:** Uses FAISS to create and query a local vector index.
     * **Simple Chat:** Provides a basic chatbot interface using a single LLM (likely Vertex AI Gemini). Best suited for simple questions related to the indexed documents.
 
+![demo_0](./img/screenshot_demo_0.png)
+
 2.  **Step 1 (`Asian_Chef_Advisor_Vertex_ES_step1.py`):**
     * **Enhanced Prompting:** Builds upon Step 0 by adding **Query Rephrasing** and **Response Summarization** prompts. This allows the system to handle more complex, long-winded questions more effectively.
+
+![demo_1](./img/screenshot_demo_1.png)
 
 3.  **Step 2 (`Asian_Chef_Advisor_Vertex_ES_step2.py`):**
     * **Dual LLM Comparison:** Introduces a second LLM (**Ollama** running locally) alongside the Vertex AI model, allowing for side-by-side response comparison for the same query.
     * **Direct Chat Mode:** Adds an option to bypass the RAG pipeline and chat directly with the selected LLMs for general knowledge questions.
     * **FAISS Caching:** Implements caching for the FAISS vector store to speed up document retrieval for previously seen queries or contexts.
+
+![demo_2](./img/screenshot_demo_2.png)
 
 4.  **Step 3 (`Asian_Chef_Advisor_Vertex_ES_step3.py`):**
     * **Cloud Vector Store:** Upgrades the vector store from local FAISS to **Google Cloud Vertex AI Search**.
@@ -42,9 +48,13 @@ The demo begins with a fictional use case for an Asian Chef Advisor chatbot for 
     * **Cloud RAG:** Continues the dual LLM comparison (Gemini + Ollama) but now uses Vertex AI Search for document retrieval.
     * **Prompt Loading:** May load prompts from external files (e.g., a `prompts/` directory - check script for details).
 
+![demo_3](./img/screenshot_demo_3.png)
+
 5.  **Step 4 (`Asian_Chef_Advisor_Vertex_ES_step4.py`):**
     * **LLM Judge:** Introduces an LLM-based "Judge" (using Vertex AI Gemini 1.5 Pro by default, configurable in the script).
     * **Automated Evaluation:** The Judge model automatically reads the responses from the two primary LLMs (Gemini and Ollama) based on the retrieved context and provides a verdict on which answer is better and why.
+
+![demo_4](./img/screenshot_demo_4.png)
 
 ## File Structure
 
@@ -116,9 +126,12 @@ The demo begins with a fictional use case for an Asian Chef Advisor chatbot for 
 
 ## Running the Demo
 
-Make sure you are in the repository's root directory and your virtual environment is activated.
+Make sure you are in the repository's src directory and your virtual environment is activated.
+```bash
+cd src
+```
 
-Execute each step using Streamlit:
+Execute each step using Streamlit in the src directory:
 
 ## Basic local RAG with local FAISS store and a simple prompt
 ```bash
@@ -147,7 +160,7 @@ streamlit run Asian_Chef_Advisor_Vertex_ES_step4.py
 ## License
 Apache 2.0 License
 
-## Copyright: Ram Seshadri (2025)
+
 
 
 
