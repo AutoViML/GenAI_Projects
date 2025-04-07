@@ -1,0 +1,31 @@
+# --- Python ---
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+sdist/
+wheelhouse/
+*.tar.gz
+*.zip
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# --- Project Specific ---
+# Ignore the local FAISS index directory and its contents
+src/faiss_index/
+
