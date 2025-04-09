@@ -1,0 +1,94 @@
+# Configuration for the Auto-Alignment Framework LLM Evaluator
+
+# --- Google Cloud Settings ---
+# Ensure GOOGLE_APPLICATION_CREDENTIALS env var is set, or run 'gcloud auth application-default login'
+# Alternatively, specify project_id and location directly if needed, though environment variables are preferred.
+project_id: "ram-test-228600" # Optional: Overrides GOOGLE_CLOUD_PROJECT env var if provided
+location: "us-central1"        # Optional: Overrides GOOGLE_CLOUD_REGION env var if provided
+
+# --- Embedding Model ---
+# Specify the Vertex AI Text Embedding Model ID
+# See: https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/text-embeddings-api
+embedding_model_id: "text-embedding-004"
+
+# --- Input DataFrame Columns ---
+# Names of the columns in your input DataFrame
+column_names:
+  case_id: "case_id"                          # Unique identifier for each row/case
+  ground_truth_rephrased: "ground_truth_rephrased_query"
+  llm_rephrased: "gemini_rephrased_query_llm"
+  ground_truth_final_answer: "ground_truth_final_answer"
+  llm_final_answer: "gemini_final_answer_llm"
+
+# --- Regex Patterns ---
+# Regular expressions used for extracting specific parts of the text
+regex_patterns:
+  # Pattern to find source identifiers (e.g., "Recipe 1", "Source A")
+  # Captures the identifier part (e.g., "1", "A") in group 1
+  source_identifier: 'Recipe (\d+)'
+  # Pattern to find the start of the ingredients section (case-insensitive)
+  ingredients_start: 'ingredients?'
+  # Pattern to find the start of the instructions section (case-insensitive)
+  # Used as a delimiter after ingredients
+  instructions_start: 'instructions?'
+  # Characters/patterns to remove from extracted ingredient/instruction text
+  text_cleanup: '[{}"•:]'
+  # Pattern to identify ignorable sentences (e.g., transition words, short non-content sentences)
+  # These won't incur penalties if mismatched in content evaluation.
+  # Example: matches single punctuation marks like "," or """
+  ignorable_sentence: '^[,"]$'
+
+# --- Evaluation Thresholds ---
+# Similarity thresholds for matching
+thresholds:
+  # Cosine similarity threshold for the Rephraser Evaluator (0.0 to 1.0)
+  rephraser_similarity: 0.80 # Example: 80% similarity required
+  # Cosine similarity threshold for matching ingredient sentences (0.0 to 1.0)
+  ingredient_similarity: 0.85 # Example: 85% similarity required
+  # Cosine similarity threshold for matching instruction sentences (0.0 to 1.0)
+  instruction_similarity: 0.75 # Example: 75% similarity required
+  # Cosine similarity threshold for identifying "No Answer" cases (0.0 to 1.0)
+  no_answer_similarity: 0.50   # Example: 50% similarity to "No answer to this question"
+
+# --- Scoring Parameters ---
+# Point values and penalties
+scoring:
+  # Points assigned for each evaluation criteria
+  max_points:
+    rephraser: 1.0
+    source: 1.0
+    ingredients: 2.0
+    instructions: 2.0
+    total: 6.0 # Sum of rephraser + source + ingredients + instructions
+
+  # Penalties (as fractions of points_per_item for the relevant section)
+  penalties:
+    # Penalty multiplier for each incorrect source cited by LLM
+    incorrect_source: 0.10 # 10% penalty per incorrect source
+    # Penalty multiplier for each GT source missed by LLM
+    missed_source: 0.20    # 20% penalty per missed source
+    # Penalty multiplier for each extra ingredient/instruction sentence by LLM
+    extra_sentence: 0.10   # 10% penalty per extra sentence
+    # Penalty multiplier for each GT ingredient/instruction sentence missed by LLM
+    missed_sentence: 0.20  # 20% penalty per missed sentence
+
+  # Specific scores assigned when a "No Answer" case is correctly identified
+  # (i.e., both GT and LLM indicate no answer)
+  no_answer_scores:
+    source: 1.0
+    ingredients: 2.0
+    instructions: 2.0
+    final: 5.0 # Note: This overrides the sum calculation for these cases
+
+# --- "No Answer" Detection ---
+# Keywords indicating an inability to answer (case-insensitive check)
+no_answer_keywords:
+  - "no answer"
+  - "cannot answer"
+  - "not able to answer"
+  - "not able to"
+  - "not found"
+  - "not available"
+  - "no relevant information"
+  - "does not contain"
+  - "unable to find"
