@@ -3,7 +3,7 @@
 # --- Google Cloud Settings ---
 # Ensure GOOGLE_APPLICATION_CREDENTIALS env var is set, or run 'gcloud auth application-default login'
 # Alternatively, specify project_id and location directly if needed, though environment variables are preferred.
-project_id: "ram-test-228600" # Optional: Overrides GOOGLE_CLOUD_PROJECT env var if provided
+project_id: "" # Optional: Overrides GOOGLE_CLOUD_PROJECT env var if provided
 location: "us-central1"        # Optional: Overrides GOOGLE_CLOUD_REGION env var if provided
 
 # --- Embedding Model ---
