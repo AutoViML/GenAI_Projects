@@ -7,6 +7,7 @@ This repo contains the demo source scripts and notebooks for the Next'25 present
 
 * `Next_25_RAG_demo`: The step by step RAG demo for Asian Chef Advisor shown in Next'25 are stored here. Instructions for running the demo are described in the README file of this folder.
 * `Auto_LLM_Evaluator`: The scripts shown in the Next'25 demo of the Auto Alignment LLM evaluator are stored here. Instructions for running the scripts are described in the README file of this folder.
+* `Dual_LLM_Generator`: The scripts for generating input files for the Auto Alignment LLM evaluator are stored here. Instructions for running the scripts are described in the README file of this folder.
 
 *Note:* Ensure your Google Cloud Project ID and Location are either set as environment variables (`GOOGLE_CLOUD_PROJECT`, `GOOGLE_CLOUD_REGION`) or specified directly in the `config.yaml` (using `project_id` and `location` keys).
 
@@ -15,3 +16,4 @@ This repo contains the demo source scripts and notebooks for the Next'25 present
 Instructions for running each demo are stored in the respective folders:
 - Next_25_RAG_demo folder
 - Auto_LLM_Evaluator folder
+- Dual_LLM_Generator folder
