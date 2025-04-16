@@ -3,6 +3,8 @@ import os
 import time
 import warnings
 from typing import Any, Dict, List, Optional, Tuple
+import google.generativeai
+import ollama
 import requests
 # import streamlit as st # REMOVED Streamlit
 import pandas as pd # ADDED Pandas
@@ -17,12 +19,11 @@ import re
 import json
 import argparse
 import sys
-import pdb
 
 # --- Configuration Constants ---
 # Keep existing constants, adjust defaults if needed for non-UI run
 DEBUG = False # Set to True for more verbose logging
-PROMPT_FOLDER = "Prompts"
+PROMPT_FOLDER = "../Prompts"
 SYSTEM_PROMPT_FILE = "system_instruction.txt"
 REPHRASER_PROMPT_FILE = "rephraser.txt"
 SUMMARIZER_PROMPT_FILE = "summarizer.txt"
@@ -39,7 +40,7 @@ DEFAULT_BRANCH_NAME = "default_branch"
 DEFAULT_COLLECTION = "default_collection"
 RAG_SKIP_PHRASES = ["I am not able to answer this question", "No RAG required"]
 GEMINI_MODEL_PREFIXES = ["gemini-1.5", "gemini-2."] # Adjusted for common models
-LEFT_MODEL_NAME = "gemini-1.5-flash-002"
+LEFT_MODEL_NAME = "gemini-2.0-flash-001"
 RIGHT_MODEL_NAME = "gemini-2.0-flash-lite-001"
 
 # --- Logging Setup ---
@@ -977,8 +978,8 @@ def run_dual_llm_pipeline(
         left_rephraser_result = generate_rephraser_response(
             left_config, user_question, system_instruction, left_vp, left_vl
         )
-        result_for_question["left_rephrased_raw"] = left_rephraser_result.get('raw_text')
-        result_for_question["left_rephrased_text"] = left_rephraser_result.get('text')
+        result_for_question[f"{LEFT_MODEL_NAME}_rephrased_raw"] = left_rephraser_result.get('raw_text')
+        result_for_question[f"{LEFT_MODEL_NAME}_rephrased_text"] = left_rephraser_result.get('text')
         result_for_question["left_rephraser_time_ms"] = left_rephraser_result.get('time_ms')
         result_for_question["left_rephraser_error"] = left_rephraser_result.get('error')
         left_config["client"] = left_rephraser_result["client"]
@@ -987,14 +988,14 @@ def run_dual_llm_pipeline(
         right_rephraser_result = generate_rephraser_response(
              right_config, user_question, system_instruction, right_vp, right_vl
         )
-        result_for_question["right_rephrased_raw"] = right_rephraser_result.get('raw_text')
-        result_for_question["right_rephrased_text"] = right_rephraser_result.get('text')
+        result_for_question[f"{RIGHT_MODEL_NAME}_rephrased_raw"] = right_rephraser_result.get('raw_text')
+        result_for_question[f"{RIGHT_MODEL_NAME}_rephrased_text"] = right_rephraser_result.get('text')
         result_for_question["right_rephraser_time_ms"] = right_rephraser_result.get('time_ms')
         result_for_question["right_rephraser_error"] = right_rephraser_result.get('error')
         right_config["client"] = right_rephraser_result["client"]
 
-        left_query_for_rag = result_for_question["left_rephrased_text"]
-        right_query_for_rag = result_for_question["right_rephrased_text"]
+        left_query_for_rag = result_for_question[f"{LEFT_MODEL_NAME}_rephrased_text"]
+        right_query_for_rag = result_for_question[f"{RIGHT_MODEL_NAME}_rephrased_text"]
 
         # --- Step 2: Retrieve Context (Conditional RAG) ---
         left_context, right_context = [], []
@@ -1036,7 +1037,7 @@ def run_dual_llm_pipeline(
         left_response_data = generate_summarizer_response(
             left_config, left_final_query, left_context, system_instruction, left_vp, left_vl
         )
-        result_for_question["left_response_text"] = left_response_data.get('text')
+        result_for_question[f"{LEFT_MODEL_NAME}_response_text"] = left_response_data.get('text')
         result_for_question["left_response_time_ms"] = left_response_data.get('time_ms')
         result_for_question["left_response_error"] = left_response_data.get('error')
         result_for_question["left_response_prompt_tokens"] = left_response_data.get('prompt_tokens')
@@ -1048,7 +1049,7 @@ def run_dual_llm_pipeline(
         right_response_data = generate_summarizer_response(
              right_config, right_final_query, right_context, system_instruction, right_vp, right_vl
         )
-        result_for_question["right_response_text"] = right_response_data.get('text')
+        result_for_question[f"{RIGHT_MODEL_NAME}_response_text"] = right_response_data.get('text')
         result_for_question["right_response_time_ms"] = right_response_data.get('time_ms')
         result_for_question["right_response_error"] = right_response_data.get('error')
         result_for_question["right_response_prompt_tokens"] = right_response_data.get('prompt_tokens')
@@ -1074,8 +1075,8 @@ def run_dual_llm_pipeline(
                 logger.info("Running Judge model...")
                 # Assume judge uses Vertex AI Gemini, pass project/location
                 judge_result = judge_responses(
-                     left_final_query, result_for_question["left_response_text"], left_context,
-                     right_final_query, result_for_question["right_response_text"], right_context,
+                     left_final_query, result_for_question[f"{LEFT_MODEL_NAME}_response_text"], left_context,
+                     right_final_query, result_for_question[f"{RIGHT_MODEL_NAME}_response_text"], right_context,
                      judge_model_name,
                      judge_system_instruction,
                      args.project_id, # Pass project/location for judge model
@@ -1135,11 +1136,15 @@ if __name__ == "__main__":
     parser.add_argument("--location", type=str, default=os.getenv("LOCATION") or os.getenv("GOOGLE_CLOUD_REGION"))
     parser.add_argument("--datastore-id", type=str, help="Vertex AI Search Data Store ID (required if --use-rag).")
     parser.add_argument("--datastore-region", type=str, help="Vertex AI Search Data Store Region (required if --use-rag).")
+
+    # Judge Config
     parser.add_argument("--judge", action="store_true", help="Enable the Judge Model evaluation.")
+
+    # Output Config
     parser.add_argument(
         "-o", "--output-path",
         type=str,
-        default="evaluation_results.csv",
+        default="evaluation_results.csv", # Save as CSV by default
         help="Path to save the results DataFrame (e.g., results.csv or results.json)."
     )
 
@@ -1249,13 +1254,13 @@ if __name__ == "__main__":
             if args.output_path.lower().endswith(".csv"):
                 results_dataframe.to_csv(args.output_path, index=False)
             elif args.output_path.lower().endswith(".json"):
-                 results_dataframe.to_json(args.output_path, orient="records", indent=2)
+                results_dataframe.to_json(args.output_path, orient="records", indent=2)
             elif args.output_path.lower().endswith(".tsv"):
-                 results_dataframe.to_csv(args.output_path, sep='\t', index=False)
+                results_dataframe.to_csv(args.output_path, sep='\t', index=False)
             else:
                  # Default to CSV if extension is unknown/missing
-                 logger.warning(f"Unknown output file extension for '{args.output_path}'. Saving as TSV file.")
-                 results_dataframe.to_csv(args.output_path, index=False, sep='\t')
+                logger.warning(f"Unknown output file extension for '{args.output_path}'. Saving as TSV file.")
+                results_dataframe.to_csv(args.output_path, index=False, sep='\t')
 
             print(f"\nResults saved successfully to {args.output_path}")
             # Optionally print head of dataframe

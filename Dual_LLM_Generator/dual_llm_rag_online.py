@@ -18,6 +18,7 @@ from langchain_google_vertexai import VertexAI
 import re
 import json
 import argparse
+import sys
 
 # --- Configuration Constants ---
 # Keep existing constants, adjust defaults if needed for non-UI run
@@ -39,6 +40,8 @@ DEFAULT_BRANCH_NAME = "default_branch"
 DEFAULT_COLLECTION = "default_collection"
 RAG_SKIP_PHRASES = ["I am not able to answer this question", "No RAG required"]
 GEMINI_MODEL_PREFIXES = ["gemini-1.5", "gemini-2."] # Adjusted for common models
+LEFT_MODEL_NAME = "gemini-2.0-flash-001"
+RIGHT_MODEL_NAME = "gemini-2.0-flash-lite-001"
 
 # --- Logging Setup ---
 logging.basicConfig(
@@ -354,6 +357,7 @@ def generate_gemini_response(
     try:
         # --- Client and Config Setup ---
         client = None
+        
         is_vertex = bool(vertex_project and vertex_location)
         chat_content_config = {
             "system_instruction":system_instruction,
@@ -421,6 +425,8 @@ def generate_ollama_response(
     Returns:
         A dictionary containing 'text', 'time_ms', 'error'.
     """
+    import ollama
+    
     start_time_ms = time.time() * 1000.0
     model_name = model_config["name"]
     result: Dict[str, Any] = {"text": "", "time_ms": 0, "error": None}
@@ -506,7 +512,7 @@ def generate_rephraser_response(
 
         if generation_result.get("error"):
              raise Exception(f"Generation failed: {generation_result['error']}")
-
+        
         rephrased_query_raw = generation_result.get("text", "")
 
         # Clean up response (JSON parsing and RAG skip phrases)
@@ -514,19 +520,19 @@ def generate_rephraser_response(
         # and primarily handle potential JSON output and cleanup.
         try:
             # Pass raw response to cleaning/parsing
-             rephrased_query_cleaned = process_rephraser_response(rephrased_query_raw)
-             # Remove RAG skip phrases after potential JSON parsing
-             for phrase in RAG_SKIP_PHRASES:
-                 rephrased_query_cleaned = rephrased_query_cleaned.replace(phrase, "").strip()
-             result["text"] = rephrased_query_cleaned
+            rephrased_query_cleaned = process_rephraser_response(rephrased_query_raw)
+            # Remove RAG skip phrases after potential JSON parsing
+            for phrase in RAG_SKIP_PHRASES:
+                rephrased_query_cleaned = rephrased_query_cleaned.replace(phrase, "").strip()
+            result["text"] = rephrased_query_cleaned
 
         except Exception as clean_e:
-             logger.warning(f"Could not clean/parse rephraser response: {clean_e}. Using raw response.")
-             # Use raw response but still remove skip phrases
-             rephrased_query_cleaned_fallback = rephrased_query_raw
-             for phrase in RAG_SKIP_PHRASES:
-                 rephrased_query_cleaned_fallback = rephrased_query_cleaned_fallback.replace(phrase, "").strip()
-             result["text"] = rephrased_query_cleaned_fallback
+            logger.warning(f"Could not clean or parse rephraser response: {clean_e}. Using raw response.")
+            # Use raw response but still remove skip phrases
+            rephrased_query_cleaned_fallback = rephrased_query_raw
+            for phrase in RAG_SKIP_PHRASES:
+                rephrased_query_cleaned_fallback = rephrased_query_cleaned_fallback.replace(phrase, "").strip()
+            result["text"] = rephrased_query_cleaned_fallback
 
 
         log_debug(f"Rephrased Query (Cleaned): {result['text']}")
@@ -534,10 +540,11 @@ def generate_rephraser_response(
     except Exception as e:
         logger.error(f"Error generating rephrased response: {e}", exc_info=True)
         result["error"] = str(e)
-        # result['text'] remains the original question default
+        
 
     result["time_ms"] = (time.time()*1000 - start_time) 
     result["client"] = generation_result["client"]
+    result['raw_text'] = rephrased_query_raw
     log_debug(f"Rephrasing time: {result['time_ms']:.0f} ms")
     return result
 
@@ -956,22 +963,23 @@ def run_dual_llm_pipeline(
             "user_question": user_question,
             "use_rag_configured": args.use_rag,
             "rag_active_for_run": rag_active, # Was RAG successfully set up?
-            "left_config": json.dumps(left_config), # Store config as string
-            "right_config": json.dumps(right_config),
+            #"left_config": json.dumps(left_config), # Store config as string
+            #"right_config": json.dumps(right_config),
         }
 
         # --- Step 1: Rephrase Query ---
         # Pass Vertex project/location if left/right model is Gemini on Vertex
-        left_vp = args.project_id if left_config.get("type") == "gemini" and rag_active else None
-        left_vl = args.location if left_config.get("type") == "gemini" and rag_active else None
-        right_vp = args.project_id if right_config.get("type") == "gemini" and rag_active else None
-        right_vl = args.location if right_config.get("type") == "gemini" and rag_active else None
+        left_vp = args.project_id if left_config.get("type") == "gemini" else None
+        left_vl = args.location if left_config.get("type") == "gemini" else None
+        right_vp = args.project_id if right_config.get("type") == "gemini" else None
+        right_vl = args.location if right_config.get("type") == "gemini" else None
 
         logger.info("Rephrasing query for Left model...")
         left_rephraser_result = generate_rephraser_response(
             left_config, user_question, system_instruction, left_vp, left_vl
         )
-        result_for_question["left_rephrased_text"] = left_rephraser_result.get('text')
+        result_for_question[f"{LEFT_MODEL_NAME}_rephrased_raw"] = left_rephraser_result.get('raw_text')
+        result_for_question[f"{LEFT_MODEL_NAME}_rephrased_text"] = left_rephraser_result.get('text')
         result_for_question["left_rephraser_time_ms"] = left_rephraser_result.get('time_ms')
         result_for_question["left_rephraser_error"] = left_rephraser_result.get('error')
         left_config["client"] = left_rephraser_result["client"]
@@ -980,17 +988,17 @@ def run_dual_llm_pipeline(
         right_rephraser_result = generate_rephraser_response(
              right_config, user_question, system_instruction, right_vp, right_vl
         )
-        result_for_question["right_rephrased_text"] = right_rephraser_result.get('text')
+        result_for_question[f"{RIGHT_MODEL_NAME}_rephrased_raw"] = right_rephraser_result.get('raw_text')
+        result_for_question[f"{RIGHT_MODEL_NAME}_rephrased_text"] = right_rephraser_result.get('text')
         result_for_question["right_rephraser_time_ms"] = right_rephraser_result.get('time_ms')
         result_for_question["right_rephraser_error"] = right_rephraser_result.get('error')
         right_config["client"] = right_rephraser_result["client"]
 
-        left_query_for_rag = result_for_question["left_rephrased_text"]
-        right_query_for_rag = result_for_question["right_rephrased_text"]
+        left_query_for_rag = result_for_question[f"{LEFT_MODEL_NAME}_rephrased_text"]
+        right_query_for_rag = result_for_question[f"{RIGHT_MODEL_NAME}_rephrased_text"]
 
         # --- Step 2: Retrieve Context (Conditional RAG) ---
         left_context, right_context = [], []
-        left_context_retrieved, right_context_retrieved = False, False
 
         if rag_active:
             # Check if rephrased query suggests skipping RAG
@@ -1001,7 +1009,6 @@ def run_dual_llm_pipeline(
             else:
                  logger.info("Retrieving context for Left query...")
                  left_context = get_relevant_docs(left_query_for_rag, retriever, retriever_llm)
-                 left_context_retrieved = bool(left_context)
                  left_final_query = left_query_for_rag # Use rephrased
 
             right_skip_rag = any(phrase in (right_query_for_rag or "") for phrase in RAG_SKIP_PHRASES)
@@ -1011,17 +1018,14 @@ def run_dual_llm_pipeline(
             else:
                  logger.info("Retrieving context for Right query...")
                  right_context = get_relevant_docs(right_query_for_rag, retriever, retriever_llm)
-                 right_context_retrieved = bool(right_context)
                  right_final_query = right_query_for_rag
         else:
              # No RAG active, use rephrased (or original if rephrase failed) query directly
              left_final_query = left_query_for_rag
              right_final_query = right_query_for_rag
 
-        result_for_question["left_context_retrieved"] = left_context_retrieved
         result_for_question["left_num_docs"] = len(left_context)
         result_for_question["left_final_query"] = left_final_query
-        result_for_question["right_context_retrieved"] = right_context_retrieved
         result_for_question["right_num_docs"] = len(right_context)
         result_for_question["right_final_query"] = right_final_query
         # Optionally store context text itself (can be large)
@@ -1033,7 +1037,7 @@ def run_dual_llm_pipeline(
         left_response_data = generate_summarizer_response(
             left_config, left_final_query, left_context, system_instruction, left_vp, left_vl
         )
-        result_for_question["left_response_text"] = left_response_data.get('text')
+        result_for_question[f"{LEFT_MODEL_NAME}_response_text"] = left_response_data.get('text')
         result_for_question["left_response_time_ms"] = left_response_data.get('time_ms')
         result_for_question["left_response_error"] = left_response_data.get('error')
         result_for_question["left_response_prompt_tokens"] = left_response_data.get('prompt_tokens')
@@ -1045,7 +1049,7 @@ def run_dual_llm_pipeline(
         right_response_data = generate_summarizer_response(
              right_config, right_final_query, right_context, system_instruction, right_vp, right_vl
         )
-        result_for_question["right_response_text"] = right_response_data.get('text')
+        result_for_question[f"{RIGHT_MODEL_NAME}_response_text"] = right_response_data.get('text')
         result_for_question["right_response_time_ms"] = right_response_data.get('time_ms')
         result_for_question["right_response_error"] = right_response_data.get('error')
         result_for_question["right_response_prompt_tokens"] = right_response_data.get('prompt_tokens')
@@ -1071,8 +1075,8 @@ def run_dual_llm_pipeline(
                 logger.info("Running Judge model...")
                 # Assume judge uses Vertex AI Gemini, pass project/location
                 judge_result = judge_responses(
-                     left_final_query, result_for_question["left_response_text"], left_context,
-                     right_final_query, result_for_question["right_response_text"], right_context,
+                     left_final_query, result_for_question[f"{LEFT_MODEL_NAME}_response_text"], left_context,
+                     right_final_query, result_for_question[f"{RIGHT_MODEL_NAME}_response_text"], right_context,
                      judge_model_name,
                      judge_system_instruction,
                      args.project_id, # Pass project/location for judge model
@@ -1110,6 +1114,7 @@ def run_dual_llm_pipeline(
 ########################### MAIN IMPLEMENTATION LOOP ##########################
 if __name__ == "__main__":
     # --- Argument Parsing ---
+    # Here parser will accept only a single question
     parser = argparse.ArgumentParser(description="Run RAG Comparison without Streamlit UI.")
 
     # Input Question(s)
@@ -1123,14 +1128,14 @@ if __name__ == "__main__":
 
     # Model Configs (Simplified - use fixed or load from separate config file?)
     # Using fixed configs for demonstration
-    DEFAULT_LEFT_CONFIG = {"type": "gemini", "name": "gemini-1.5-flash-002", "temperature": DEFAULT_GEMINI_TEMPERATURE}
+    DEFAULT_LEFT_CONFIG = {"type": "gemini", "name": LEFT_MODEL_NAME, "temperature": DEFAULT_GEMINI_TEMPERATURE}
     #DEFAULT_RIGHT_CONFIG = {"type": "3p_models", "name": "llama3"} # Ensure 'llama3' is pulled in Ollama
-    DEFAULT_RIGHT_CONFIG = {"type": "gemini", "name": "gemini-2.0-flash-001", "temperature": 0.3} # Same as Gemini
+    DEFAULT_RIGHT_CONFIG = {"type": "gemini", "name": RIGHT_MODEL_NAME, "temperature": 0.3} # Same as Gemini
 
-    # RAG Config
+    # Keep other arguments (RAG, Judge, Output, Project, Location, Datastore etc.)
     parser.add_argument("--use-rag", action="store_true", help="Enable RAG using Vertex AI Search.")
     parser.add_argument("--project-id", type=str, default=os.getenv("PROJECT_ID") or os.getenv("GOOGLE_CLOUD_PROJECT"), help="Google Cloud Project ID for Vertex AI/Search.")
-    parser.add_argument("--location", type=str, default=os.getenv("LOCATION") or os.getenv("GOOGLE_CLOUD_REGION") or DEFAULT_DATA_STORE_LOCATION, help="Google Cloud Location for Vertex AI/Search.")
+    parser.add_argument("--location", type=str, default=os.getenv("LOCATION") or os.getenv("GOOGLE_CLOUD_REGION"))
     parser.add_argument("--datastore-id", type=str, help="Vertex AI Search Data Store ID (required if --use-rag).")
     parser.add_argument("--datastore-region", type=str, help="Vertex AI Search Data Store Region (required if --use-rag).")
 
@@ -1145,27 +1150,26 @@ if __name__ == "__main__":
         help="Path to save the results DataFrame (e.g., results.csv or results.json)."
     )
 
-    args = parser.parse_args()
+    args = parser.parse_args() # Parse arguments from command line
 
-    # --- Validate Args ---
+    # --- Validate Args (Keep RAG validation) ---
     if args.use_rag and not args.datastore_id:
         parser.error("--datastore-id is required when --use-rag is specified.")
     if args.use_rag and (not args.project_id or not args.location):
          parser.error("--project-id and --location are required when --use-rag is specified (or set corresponding env vars).")
 
-
-    # --- Load Prompts ---
+    # --- Load Prompts (Keep existing logic) ---
     system_instruction = None
     judge_system_instruction = None
     judge_model_name = None
     try:
-         sys_prompt_path = os.path.join(PROMPT_FOLDER, SYSTEM_PROMPT_FILE)
-         system_instruction = load_text_file(sys_prompt_path)
-         logger.info("Loaded system instruction.")
+        sys_prompt_path = os.path.join(PROMPT_FOLDER, SYSTEM_PROMPT_FILE)
+        system_instruction = load_text_file(sys_prompt_path)
+        logger.info("Loaded system instruction.")
 
-         if args.judge:
-             judge_prompt_path = os.path.join(PROMPT_FOLDER, JUDGE_PROMPT_FILE)
-             judge_system_instruction = load_text_file(judge_prompt_path)
+        if args.judge:
+            judge_prompt_path = os.path.join(PROMPT_FOLDER, JUDGE_PROMPT_FILE)
+            judge_system_instruction = load_text_file(judge_prompt_path)
              logger.info("Loaded judge system instruction.")
              judge_model_name_path = os.path.join(PROMPT_FOLDER, JUDGE_MODEL_NAME_FILE)
              # Clean potential newline from file
@@ -1191,46 +1195,48 @@ if __name__ == "__main__":
 
     # --- Run Main Evaluation ---
     logger.info("Starting evaluation run...")
+    # Pass the question to the evaluation function
+    # The function must process question internally and return a response.    
     results_dataframe = run_dual_llm_pipeline(
-         args,
-         questions_to_process,
-         left_model_config,
-         right_model_config,
-         system_instruction,
-         judge_system_instruction,
-         judge_model_name,
+        args,
+        questions_to_process,
+        left_model_config,
+        right_model_config,
+        system_instruction,
+        judge_system_instruction,
+        judge_model_name,
     )
 
     # --- Save Results ---
     if not results_dataframe.empty:
-         logger.info(f"Saving results DataFrame to {args.output_path}...")
-         try:
-             # Save based on output file extension
-             if args.output_path.lower().endswith(".csv"):
-                 results_dataframe.to_csv(args.output_path, index=False)
-             elif args.output_path.lower().endswith(".json"):
-                  results_dataframe.to_json(args.output_path, orient="records", indent=2)
-             elif args.output_path.lower().endswith(".tsv"):
-                  results_dataframe.to_csv(args.output_path, sep='\t', index=False)
-             else:
-                  # Default to CSV if extension is unknown/missing
-                  logger.warning(f"Unknown output file extension for '{args.output_path}'. Saving as CSV.")
-                  results_dataframe.to_csv(args.output_path, index=False)
+        logger.info(f"Saving results DataFrame to {args.output_path}...")
+        try:
+            # Save based on output file extension
+            if args.output_path.lower().endswith(".csv"):
+                results_dataframe.to_csv(args.output_path, index=False)
+            elif args.output_path.lower().endswith(".json"):
+                results_dataframe.to_json(args.output_path, orient="records", indent=2)
+            elif args.output_path.lower().endswith(".tsv"):
+                results_dataframe.to_csv(args.output_path, sep='\t', index=False)
+            else:
+                # Default to CSV if extension is unknown/missing
+                logger.warning(f"Unknown output file extension for '{args.output_path}'. Saving as CSV.")
+                results_dataframe.to_csv(args.output_path, index=False)
 
-             print(f"\nResults saved successfully to {args.output_path}")
-             # Optionally print head of dataframe
-             print("\nResults DataFrame Head:")
-             print(results_dataframe.head().to_string())
+            print(f"\nResults saved successfully to {args.output_path}")
+            # Optionally print head of dataframe
+            print("\nResults DataFrame Head:")
+            print(results_dataframe.head().to_string())
 
          except Exception as e:
-             logger.error(f"Failed to save results DataFrame: {e}", exc_info=True)
-             print(f"Error: Could not save results to {args.output_path}: {e}", file=sys.stderr)
-             # Optionally print DF to console as fallback
-             print("\nResults DataFrame (print fallback):")
-             print(results_dataframe.to_string())
+            logger.error(f"Failed to save results DataFrame: {e}", exc_info=True)
+            print(f"Error: Could not save results to {args.output_path}: {e}", file=sys.stderr)
+            # Optionally print DF to console as fallback
+            print("\nResults DataFrame (print fallback):")
+            print(results_dataframe.to_string())
     else:
-         logger.warning("No results generated, DataFrame is empty. Nothing saved.")
-         print("\nNo results generated.", file=sys.stderr)
+        logger.warning("No results generated, DataFrame is empty. Nothing saved.")
+        print("\nNo results generated.", file=sys.stderr)
 
 
     logger.info("Script finished.")
