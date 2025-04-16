@@ -17,9 +17,9 @@ There are two scripts in this folder: one processes multiple questions read from
 
 ## File Structure
 
-1. There are two main scripts: dual_llm_rag_online.py and dual_llm_rag_batch.py
+There are two main scripts: dual_llm_rag_online.py and dual_llm_rag_batch.py
 
-* `dual_llm_rag_online.py`: The main Python script to execute the entire pipeline for a single query. *(This script is helpful to compare answers for a single question)*
+1. `dual_llm_rag_online.py`: The main Python script to execute the entire pipeline for a single query. *(This script is helpful to compare answers for a single question)*
 * `requirements.txt`: Lists the required Python packages for installation.
 * `prompts/`: Directory containing essential prompt template files:
     * `system_instruction.txt`: Base system instructions applied to LLMs.
@@ -30,7 +30,7 @@ There are two scripts in this folder: one processes multiple questions read from
 * `-q` (query: "Give me a spicy fish recipe"): A string containing a question that you want to be processed. 
 * `evaluation_results.csv` (Default Output): The file where the script saves the detailed evaluation results. The format (CSV, JSON, TSV) depends on the extension specified in the `--output-path` argument.
 
-* `dual_llm_rag_batch.py`: The main Python script to execute the entire pipeline for multiple queries in a TSV or CSV file. *(This script is helpful to compare answers for multiple questions)*
+2. `dual_llm_rag_batch.py`: The main Python script to execute the entire pipeline for multiple queries in a TSV or CSV file. *(This script is helpful to compare answers for multiple questions)*
 * `-i` (`.path_to_file/dataset.tsv`) (Default Input): A Tab-Separated Value file containing the questions to be processed. Must include a header row with a column named `case_id`, 	`query`, `ground_truth_rephrased_query`,		`ground_truth_final_answer`.
 * `requirements.txt`: Lists the required Python packages for installation.
 * `prompts/`: Directory containing essential prompt template files:
