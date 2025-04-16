@@ -17,7 +17,7 @@ There are two scripts in this folder: one processes multiple questions read from
 
 ## File Structure
 
-There are two main scripts: dual_llm_rag_online.py and dual_llm_rag_batch.py
+There are two main scripts in this folder: dual_llm_rag_online.py and dual_llm_rag_batch.py
 
 1. `dual_llm_rag_online.py`: The main Python script to execute the entire pipeline for a single query. *(This script is helpful to compare answers for a single question)*
 * `requirements.txt`: Lists the required Python packages for installation.
@@ -110,7 +110,7 @@ Run the script from your terminal within the activated virtual environment.
 Example (No RAG, No Judge - quick option with single question):
 
 ```bash
-python rag_demo_dual_llms_single_query.py -q "Can you give me a spicy fish recipe?" -o results_no_rag.csv
+python dual_llm_rag_online.py -q "Can you give me a spicy fish recipe?" -o results_no_rag.csv
 ```
 
 Example (No RAG, No Judge - quick option with a CSV or TSV file ):
