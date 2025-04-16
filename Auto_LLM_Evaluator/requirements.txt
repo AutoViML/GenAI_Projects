@@ -1,7 +1,7 @@
-pandas>=1.5
-numpy>=1.26.4, <2
+pandas<2
+numpy <2
 regex>=2023.10.3
 PyYAML>=6.0
 google-cloud-aiplatform==1.76.0
-sentence-transformers>=4.0.1
+sentence-transformers<=4.0.1
 
