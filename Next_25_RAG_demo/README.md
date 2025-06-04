@@ -109,11 +109,20 @@ The demo begins with a fictional use case for an Asian Chef Advisor chatbot for 
     gcloud config set project YOUR_PROJECT_ID
     ```
     Replace `YOUR_PROJECT_ID` with your actual Google Cloud project ID.
-6.  **(Steps 3 & 4 Only) Prepare Cloud Resources:**
+
+6. **Configure your environment variables:**
+Set Default Project and setting these variables on command line:
+    ```bash
+    export PROJECT_ID="YOUR_PROJECT_ID"
+    export LOCATION="us-central1" (or any other region)
+    export GOOGLE_VERTEXAI="True" (if you are using models from Google or RAG from Google Vertex Search)
+    ```
+
+7.  **(Steps 3 & 4 Only) Prepare Cloud Resources:**
     * Create a GCS bucket in your project.
     * Upload the documents from the `recipes/` directory (or your own documents) to the GCS bucket.
     * Go to the Vertex AI Search console in Google Cloud and create a new Search App/Datastore. Configure it to index the data from your GCS bucket. Note the **Datastore ID**.
-7.  **(Steps 2, 3, 4 Only) Prepare Ollama:**
+8.  **(Steps 2, 3, 4 Only) Prepare Ollama:**
     * Ensure Ollama is installed and the service is running.
     * Pull the models you intend to use (check the Python scripts for defaults, e.g., `ollama pull llama3`).
 
