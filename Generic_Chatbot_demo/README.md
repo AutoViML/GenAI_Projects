@@ -13,31 +13,39 @@ This is how your final demo will look like once it is running
 Follow these intructions at: https://cloud.google.com/sdk/docs/install to install the google cloud SDK and gcloud CLI. 
     
 2. Once the gcloud CLI is installed, test the gcloud cli using:
+```bash
 gcloud init
-
+```
 3. Authenticate using your Google Cloud auth as follows:
+```bash
 gloud auth login
-
+```
 4. In order to run apps, you need to authenticate at the app level:
+```bash
 gcloud auth application-default login
-
+```
 5. Set the default project as follows:
+```bash
 export GOOGLE_VERTEXAI="True"
 export PROJECT_ID="project_id" #replace project_id with your project_id
 export LOCATION="us-central1"
-
+```
 6. Now install the requirements file:
+```bash
 pip install -r requirements.txt
-
+```
 7. change the directory to the source code:
+```bash
 cd src
-
+```
 7. Now you are ready to run the demo from the source code folder (without a judge model):
+```bash
 streamlit run generic_ai_chatbot_demo_single_llm_judge.py
-
+```
 If you want to run the demo with a judge model evaluating the two model responses, use this command (notice the double dash is repeated twice!):
+```bash
 streamlit run generic_ai_chatbot_demo_single_llm_judge.py -- --judge
-
+```
 8. To end the demo, press Control-C (^C) couple of times to kill it.
 
 # How to customize the demo to your needs
